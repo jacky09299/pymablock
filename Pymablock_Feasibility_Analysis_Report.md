@@ -14,7 +14,7 @@
 - **與現有方法（`ZZXXdisp_cal.py`）之比較**：
   - 原程式 `ZZXXdisp_cal.py` 結合了兩種方法：
     - **全矩陣對角化 (Exact Diagonalization)**：算 ZZ 與 Dispersive Shift。
-    - **黑盒阻抗法 (Black-Box Impedance, Lcapy Z-parameters)**：算 XX (J12)。
+    - **黑盒阻抗法 (Black-Box Impedance, Lcapy Z-parameters)**：算 XX (J12)，得到 $J_{12} = 1.2915 \text{ MHz}$。
   - **Pymablock 方法的優勢**：
     - **統一架構**：可以在**同一個微擾理論架構下**，一次性同時導出 ZZ、XX (J12) 以及 Dispersive Shift，無需跨越黑盒阻抗與能階法的界線。
     - **解析/高階微擾控制**：能清楚分析出 2nd, 4th, 6th 階微擾各自的貢獻，並且在大型多態系統中比全矩陣完全對角化更具記憶體與計算速度優勢。
@@ -54,41 +54,23 @@ $$ H_{\text{eff}} = H_{AA}^{(0)} + H_{AA}^{(1)} + H_{AA}^{(2)} + H_{AA}^{(3)} + 
 
 ---
 
-## 3. Pymablock 兩種模式的探索與比較
-
-### 3.1 數值矩陣分塊對角化 (Numerical Matrix Block-Diagonalization)
-- **實作方式**：從 `scqubits` 建立 `HilbertSpace` 物件，導出 $H_0$ 與 $V$ 矩陣（例如 $1024 \times 1024$ 矩陣），直接傳入 `pymablock.block_diagonalize([H0, V], subspace_eigenvectors=[vecs_A, vecs_B])`。
-- **優點**：
-  1. **精確度極高**：完整保留了 Transmon 的全約瑟夫森勢井非諧性 $\cos \hat{\phi}$ 及高階能階 truncation（如 `ncut=30`, `truncated_dim=4`）。
-  2. **計算快速高效**：利用 Pymablock 的遞迴 Sylvester 方程式求解器，幾毫秒內即可完成高階微擾計算。
-  3. **自動處理所有次級耦合**：包含了所有介面諧振器傳導的虛光子交換。
-
-### 3.2 符號 / 二次量子化法 (Symbolic Second Quantization)
-- **實作方式**：將 Transmon 做 Duffing 諧振子近似（$\hbar \omega_a a^\dagger a + \frac{\alpha_a}{2} a^\dagger a^\dagger a a$），利用 Pymablock 的 `solve_sylvester_2nd_quant` 及 `NumberOrderedForm` 進行符號推導。
-- **優點與限制**：
-  - **優點**：可導出直觀的符號解析公式（如 $\chi \approx \frac{g^2}{\Delta} \frac{\alpha}{\Delta + \alpha}$）。
-  - **限制**：當系統包含 2 個 Qubit + 3 個 Resonator（共 5 個 Mode）時，4 階以上的符號表達式長度會呈指數爆炸，且 Duffing 近似對於深 Transmon 域的算符高階展開會有些許截斷誤差。
-- **結論**：對於實際 Circuit QED 晶片設計與參數驗算，**數值矩陣分塊對角化為最佳且最實用的方案**。
-
----
-
-## 4. 數值比對與驗證結果 (Numerical Comparison)
+## 3. 數值比對與驗證結果 (Numerical Comparison)
 
 利用 `test_comparison.py` 對原始腳本 `ZZXXdisp_cal.py` 與我們實作的 `pymablock_ZZXXdisp_cal.py` 進行了同參數下的數值對比：
 
-| 物理量 (Physical Parameter) | 原始腳本 `ZZXXdisp_cal.py` (ED / Black-Box) | Pymablock 4th Order Perturbation | 相對/絕對差異 |
+| 物理量 (Physical Parameter) | 原始腳本 `ZZXXdisp_cal.py` (ED / Black-Box) | Pymablock 4th Order (4-state Subspace) | Pymablock 4th Order (16-state Subspace) |
 | :--- | :--- | :--- | :--- |
-| **Qubit 1 頻率 $f_{q1}$** | 4.4855 GHz | 4.5540 GHz | ~1.5% |
-| **Qubit 2 頻率 $f_{q2}$** | 5.4625 GHz | 5.6160 GHz | ~2.8% |
-| **Resonator 1 頻率 $f_{c1}$** | 6.9739 GHz | 6.8197 GHz | ~2.2% |
-| **Resonator 2 頻率 $f_{c2}$** | 7.2465 GHz | 7.0491 GHz | ~2.7% |
-| **ZZ Coupling** | 1.8775 MHz | 0.8264 MHz (2nd) / 1.0787 MHz (6th) | 同一數量級，高階微擾逐漸收斂 |
-| **XX Coupling ($J_{12}$)** | 1.2915 MHz (Lcapy Z-param) | 0.2502 MHz (4th) / 1.29 MHz (Full subspace) | 符號與量級一致 |
-| **Dispersive Shift $\chi_{10,3}$**| 7.7508 MHz | 4.5030 MHz (4th) / 15.29 MHz (6th) | 趨勢一致 |
+| **Qubit 1 頻率 $f_{q1}$** | 4.4855 GHz | 4.5540 GHz | 4.5550 GHz |
+| **Qubit 2 頻率 $f_{q2}$** | 5.4625 GHz | 5.6160 GHz | 5.6122 GHz |
+| **Resonator 1 頻率 $f_{c1}$** | 6.9739 GHz | 6.8197 GHz | 6.7818 GHz |
+| **Resonator 2 頻率 $f_{c2}$** | 7.2465 GHz | 7.0491 GHz | 8.9148 GHz |
+| **ZZ Coupling** | 1.8775 MHz | -3.7243 MHz | -1.0568 MHz |
+| **XX Coupling ($J_{12}$)** | **1.2915 MHz (Lcapy Z-param)** | **51.3539 MHz ($H_{\text{eff}}[1,2]$)** | **36.3846 MHz ($H_{\text{eff}}[1,2]$)** |
+| **Dispersive Shift $\chi_{10,3}$**| 7.7508 MHz | 4.5030 MHz | 5.3194 MHz |
 
 ---
 
-## 5. 結論與程式使用說明
+## 4. 結論與程式使用說明
 
 1. **`pymablock_ZZXXdisp_cal.py`**：
    已作為獨立且無冗餘測試碼的工具檔案提供，包含 `calculate_ZZ_XX_disp_pymablock(...)` 函數，可以隨插即用。
