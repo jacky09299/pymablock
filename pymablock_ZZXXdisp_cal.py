@@ -157,11 +157,12 @@ def calculate_ZZ_XX_disp_pymablock(
     Calculate ZZ, XX coupling, qubit frequencies, coupler frequencies, and dispersive shifts
     using Pymablock quasi-degenerate matrix perturbation theory.
 
+    Target subspace includes all 16 states with q1, q2 in {0, 1} and at most 1 photon in all resonators.
+
     Returns:
     --------
     fq1, fq2, fc1, fc2, ZZ, XX, disp_10_3, disp_01_3, disp_10_4, disp_01_4
-    (all frequencies/coupling values in GHz, except ZZ, XX, disp in GHz or MHz as desired;
-     here returned matching ZZXXdisp_cal.py units in GHz for raw outputs).
+    (all frequencies/coupling values in GHz, matching ZZXXdisp_cal.py output signature).
     """
     hilbertspace, subsystems = build_coupled_circuit_hilbertspace(
         L, C, L_side, C_side, Cc, EC1, EJ1, EC2, EJ2, truncated_dim=truncated_dim
@@ -175,25 +176,15 @@ def calculate_ZZ_XX_disp_pymablock(
 
     dim = H0_mat.shape[0]
 
-    # Target states to include in effective subspace for accurate ZZ, XX, and dispersive shifts
-    # Subsystem order: (q1, q2, r1, r2, r3)
-    states_to_include = [
-        # Computational qubit states with resonators in ground state
-        (0, 0, 0, 0, 0),
-        (1, 0, 0, 0, 0),
-        (0, 1, 0, 0, 0),
-        (1, 1, 0, 0, 0),
-        # 1-photon excitations for Resonator 1 (r1)
-        (0, 0, 1, 0, 0),
-        (1, 0, 1, 0, 0),
-        (0, 1, 1, 0, 0),
-        (1, 1, 1, 0, 0),
-        # 1-photon excitations for Resonator 2 (r2)
-        (0, 0, 0, 1, 0),
-        (1, 0, 0, 1, 0),
-        (0, 1, 0, 1, 0),
-        (1, 1, 0, 1, 0),
-    ]
+    # Include all 16 target states with q1, q2 in {0, 1} and r1 + r2 + r3 <= 1
+    states_to_include = []
+    for q1 in range(2):
+        for q2 in range(2):
+            for r1 in range(2):
+                for r2 in range(2):
+                    for r3 in range(2):
+                        if r1 + r2 + r3 <= 1:
+                            states_to_include.append((q1, q2, r1, r2, r3))
 
     subset_flat = [multi_to_flat(idx, dims) for idx in states_to_include]
 
